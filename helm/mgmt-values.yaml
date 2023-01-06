@@ -1,0 +1,17 @@
+global:
+  cluster: mgmt
+insecure: false
+mgmtClusterName: mgmt
+glooMeshMgmtServer:
+  serviceType: LoadBalancer
+  relay:
+    disableCa: true                     # Disable mesh CA
+    disableCaCertGeneration: true       # Don't generate CA certs
+    disableTokenGeneration: true        # Don't generate tokens
+    tlsSecret:
+      name: gloo-server-tls-cert        # The cert is here
+  ports:
+    healthcheck: 8091
+glooMeshUi:
+  serviceType: ClusterIP
+  enabled: true
