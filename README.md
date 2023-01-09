@@ -333,11 +333,11 @@ to the management cluster.
     helm upgrade --install \
         gloo-mesh-enterprise gloo-mesh-enterprise/gloo-mesh-enterprise \
         --namespace gloo-mesh \
-        --kube-context ${MGMT}
+        --kube-context ${MGMT} \
         --create-namespace \
         --version ${GLOO_MESH_VERSION} \
         --set-string licenseKey=${GLOO_MESH_LICENSE_KEY} \
-        --values helm/mgmt-values.yaml \
+        --values helm/mgmt-values.yaml
     ```
 
 You may want to inspect the `helm/mgmt-values.yaml` file used here.
@@ -346,8 +346,11 @@ You may want to inspect the `helm/mgmt-values.yaml` file used here.
 
 # Get the management server endpoint
 The workload agents need to know the endpoint of the Gloo Mesh
-Management Server. Set the environment variables here and
-echo MGMT_SERVER_NETWORKING_ADDRESS to verify it is valid:
+Management Server. Set the environment variable
+`MGMT_SERVER_NETWORKING_ADDRESS` to the URL of the Gloo Mesh
+Management Server.
+
+For example, if the management cluster is on GKE you can do this:
 
 ```bash
 MGMT_INGRESS_ADDRESS=$(kubectl get svc -n gloo-mesh gloo-mesh-mgmt-server --context ${MGMT} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
@@ -356,8 +359,21 @@ MGMT_SERVER_NETWORKING_ADDRESS=${MGMT_INGRESS_ADDRESS}:${MGMT_INGRESS_PORT}
 echo $MGMT_SERVER_NETWORKING_ADDRESS
 ```
 
-The helm chart will refer to the above $MGMT_SERVER_NETWORKING_ADDRESS value
-as the Gloo Mesh Management Server's `serverAddress`.
+Or if the management cluster is on EKS you can do this:
+
+
+```bash
+MGMT_SERVER_NETWORKING_DOMAIN=$(kubectl get svc -n gloo-mesh gloo-mesh-mgmt-server --context $MGMT -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+MGMT_SERVER_NETWORKING_PORT=$(kubectl -n gloo-mesh get service gloo-mesh-mgmt-server --context $MGMT -o jsonpath='{.spec.ports[?(@.name=="grpc")].port}')
+MGMT_SERVER_NETWORKING_ADDRESS=${MGMT_SERVER_NETWORKING_DOMAIN}:${MGMT_SERVER_NETWORKING_PORT}
+echo $MGMT_SERVER_NETWORKING_ADDRESS
+```
+
+Verify the value of `MGMT_SERVER_NETWORKING_ADDRESS` is correct
+for your environment.
+
+The helm chart will refer to the above `MGMT_SERVER_NETWORKING_ADDRESS`
+value as the Gloo Mesh Management Server's `serverAddress`.
 
 ## Deploy the workload agents
 
@@ -399,22 +415,30 @@ done
 # Verify the clusters have been registered correctly
 
 You can check the cluster(s) have been registered correctly using the
-following commands:
+following command:
 
 
 ```bash
-pod=$(kubectl --context ${MGMT} -n gloo-mesh get pods -l app=gloo-mesh-mgmt-server -o jsonpath='{.items[0].metadata.name}')
-kubectl --context ${MGMT} -n gloo-mesh debug -q -i ${pod} --image=curlimages/curl -- curl -s http://localhost:9091/metrics | grep relay_push_clients_connected
+meshctl check --kubecontext $MGMT
 ```
 
-You should get an output similar to this (it may take a minute or so
-to report this):
+You should see output similar to this. Note it may take a minute or so
+to report the clusters are registered:
 
 ```bash
-# HELP relay_push_clients_connected Current number of connected Relay push clients (Relay Agents).
-# TYPE relay_push_clients_connected gauge
-relay_push_clients_connected{cluster="cluster1"} 1
-relay_push_clients_connected{cluster="cluster2"} 1
+Checking Gloo Mesh Management Cluster Installation
+--------------------------------------------
+
+🟢 Gloo Mgmt Server Deployment Status
+
+🟢 Gloo Mgmt Server Connectivity to Agents
++----------+------------+-------------------------------------------------+
+| CLUSTER  | REGISTERED |                  CONNECTED POD                  |
++----------+------------+-------------------------------------------------+
+| cluster1 | true       | gloo-mesh/gloo-mesh-mgmt-server-cb5bbb5fc-5g45b |
++----------+------------+-------------------------------------------------+
+| cluster2 | true       | gloo-mesh/gloo-mesh-mgmt-server-cb5bbb5fc-5g45b |
++----------+------------+-------------------------------------------------+
 ```
 
 Alternatively you can bring up the Gloo Mesh dashboard and verify

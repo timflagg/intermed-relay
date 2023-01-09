@@ -13,5 +13,5 @@ glooMeshMgmtServer:
   ports:
     healthcheck: 8091
 glooMeshUi:
-  serviceType: ClusterIP
+  serviceType: LoadBalancer
   enabled: true
